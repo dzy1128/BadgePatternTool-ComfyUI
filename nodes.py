@@ -565,84 +565,6 @@ class InteractivePreviewNode:
         return (pil2tensor(preview_canvas), hint_text)
 
 
-class DraggableEditorNode:
-    """
-    可拖拽编辑器节点 - 在节点内直接拖拽图片和缩放
-    
-    特性：
-    - 鼠标拖拽：直接在编辑器中拖动图片位置
-    - 滚轮缩放：使用鼠标滚轮放大/缩小图片
-    - 实时预览：显示圆形裁剪边界和中心参考线
-    - 参数同步：拖拽和缩放自动更新参数值
-    """
-    
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "diameter_mm": ("FLOAT", {
-                    "default": 58.0,
-                    "min": 10.0,
-                    "max": 200.0,
-                    "step": 1.0
-                }),
-                "dpi": ("INT", {
-                    "default": 300,
-                    "min": 72,
-                    "max": 600,
-                    "step": 1
-                }),
-            },
-            "optional": {
-                "scale": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.1,
-                    "max": 5.0,
-                    "step": 0.01
-                }),
-                "offset_x": ("INT", {
-                    "default": 0,
-                    "min": -2000,
-                    "max": 2000,
-                    "step": 1
-                }),
-                "offset_y": ("INT", {
-                    "default": 0,
-                    "min": -2000,
-                    "max": 2000,
-                    "step": 1
-                }),
-            },
-        }
-    
-    RETURN_TYPES = ("IMAGE", "FLOAT", "INT", "INT")
-    RETURN_NAMES = ("裁剪结果", "当前缩放", "当前偏移X", "当前偏移Y")
-    FUNCTION = "process"
-    CATEGORY = "徽章工具/可拖拽编辑"
-    
-    def process(self, image, diameter_mm, dpi, scale=1.0, offset_x=0, offset_y=0):
-        """
-        处理图片裁剪
-        
-        前端编辑器会自动更新scale、offset_x、offset_y参数
-        用户可以在编辑器中直接拖拽和缩放
-        """
-        # 使用当前参数进行裁剪
-        crop_node = CircularCropNode()
-        result = crop_node.crop_to_circle(
-            image=image,
-            diameter_mm=diameter_mm,
-            scale=scale,
-            offset_x=offset_x,
-            offset_y=offset_y,
-            rotation=0,
-            dpi=dpi
-        )
-        
-        return (result[0], scale, offset_x, offset_y)
-
-
 class ParameterAdjustNode:
     """参数微调节点 - 提供便捷的增量调整"""
     
@@ -749,6 +671,191 @@ class ParameterAdjustNode:
         return (new_scale, new_x, new_y, change_text)
 
 
+class VisualGuideCropNode:
+    """可视化引导裁剪节点 - 结合预览和裁剪的一体化节点"""
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "diameter_mm": ("FLOAT", {
+                    "default": 58.0,
+                    "min": 10.0,
+                    "max": 200.0,
+                    "step": 1.0
+                }),
+                "scale": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 0.1,
+                    "max": 5.0,
+                    "step": 0.01,
+                    "display": "slider"
+                }),
+                "offset_x": ("INT", {
+                    "default": 0,
+                    "min": -1000,
+                    "max": 1000,
+                    "step": 1
+                }),
+                "offset_y": ("INT", {
+                    "default": 0,
+                    "min": -1000,
+                    "max": 1000,
+                    "step": 1
+                }),
+                "dpi": ("INT", {
+                    "default": 300,
+                    "min": 72,
+                    "max": 600,
+                    "step": 1
+                }),
+            },
+        }
+    
+    RETURN_TYPES = ("IMAGE", "IMAGE", "STRING")
+    RETURN_NAMES = ("裁剪结果", "预览图", "参数信息")
+    FUNCTION = "process"
+    CATEGORY = "徽章工具/交互辅助"
+    
+    def process(self, image, diameter_mm, scale, offset_x, offset_y, dpi):
+        """
+        同时输出裁剪结果和带参考线的预览图
+        方便在一个节点中查看效果并调整
+        """
+        # 1. 生成裁剪结果
+        crop_node = CircularCropNode()
+        cropped = crop_node.crop_to_circle(image, diameter_mm, scale, offset_x, offset_y, 0, dpi)
+        
+        # 2. 生成预览图
+        preview_node = InteractivePreviewNode()
+        preview, hint = preview_node.create_preview(
+            image, diameter_mm, scale, offset_x, offset_y, dpi, "是", "是"
+        )
+        
+        # 3. 生成参数信息
+        circle_diameter_px = int(diameter_mm / 25.4 * dpi)
+        info = f"""参数总览:
+徽章直径: {diameter_mm}mm ({circle_diameter_px}px @ {dpi}dpi)
+缩放比例: {scale:.2f}x
+X轴偏移: {offset_x}px
+Y轴偏移: {offset_y}px
+
+快速调整提示:
+1. 观察预览图中的红圈(裁剪边界)
+2. 确保主体内容在蓝圈(安全区)内
+3. 使用参数微调节点快速调整
+4. 或直接修改上方的scale/offset参数"""
+        
+        return (cropped[0], preview[0], info)
+
+
+class InteractiveImageEditorNode:
+    """
+    交互式图片编辑器节点 - 支持鼠标拖拽和滚轮缩放
+    
+    注意：此节点需要前端JavaScript支持
+    前端文件位于: web/badge_interactive.js
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "diameter_mm": ("FLOAT", {
+                    "default": 58.0,
+                    "min": 10.0,
+                    "max": 200.0,
+                    "step": 1.0
+                }),
+                "dpi": ("INT", {
+                    "default": 300,
+                    "min": 72,
+                    "max": 600,
+                    "step": 1
+                }),
+            },
+            "optional": {
+                "scale": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 0.1,
+                    "max": 5.0,
+                    "step": 0.01,
+                    "display": "number"
+                }),
+                "offset_x": ("INT", {
+                    "default": 0,
+                    "min": -1000,
+                    "max": 1000,
+                    "step": 1
+                }),
+                "offset_y": ("INT", {
+                    "default": 0,
+                    "min": -1000,
+                    "max": 1000,
+                    "step": 1
+                }),
+            },
+        }
+    
+    RETURN_TYPES = ("IMAGE", "FLOAT", "INT", "INT", "STRING")
+    RETURN_NAMES = ("裁剪结果", "当前缩放", "当前偏移X", "当前偏移Y", "使用说明")
+    FUNCTION = "interactive_edit"
+    CATEGORY = "徽章工具/交互编辑"
+    
+    # 告诉ComfyUI这个节点有自定义widget
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        # 强制每次都重新计算，保证参数更新
+        return float("nan")
+    
+    def interactive_edit(self, image, diameter_mm, dpi, scale=1.0, offset_x=0, offset_y=0):
+        """
+        交互式编辑功能
+        
+        前端会自动更新scale、offset_x、offset_y参数
+        用户可以：
+        - 鼠标拖拽图片移动位置
+        - 滚轮缩放图片大小
+        - 实时看到圆形边界参考线
+        """
+        # 使用当前参数进行裁剪
+        crop_node = CircularCropNode()
+        result = crop_node.crop_to_circle(
+            image=image,
+            diameter_mm=diameter_mm,
+            scale=scale,
+            offset_x=offset_x,
+            offset_y=offset_y,
+            rotation=0,
+            dpi=dpi
+        )
+        
+        # 生成使用说明
+        instructions = f"""交互式编辑器使用说明:
+
+🖱️ 鼠标操作:
+• 拖拽: 按住鼠标左键拖动图片
+• 缩放: 滚动鼠标滚轮放大/缩小
+
+📊 当前参数:
+• 缩放: {scale:.2f}x
+• X偏移: {offset_x}px
+• Y偏移: {offset_y}px
+• 徽章直径: {diameter_mm}mm
+
+🔴 红色圆圈 = 裁剪边界
+🟢 绿色十字 = 中心参考点
+
+💡 提示:
+• 参数会自动同步到节点
+• 调整满意后执行工作流
+• 可以连接到其他节点继续处理"""
+        
+        return (result[0], scale, offset_x, offset_y, instructions)
+
+
 # 节点映射字典
 NODE_CLASS_MAPPINGS = {
     "CircularCropNode": CircularCropNode,
@@ -756,20 +863,21 @@ NODE_CLASS_MAPPINGS = {
     "AutoOptimizeBadgeNode": AutoOptimizeBadgeNode,
     "InteractivePreviewNode": InteractivePreviewNode,
     "ParameterAdjustNode": ParameterAdjustNode,
-    "DraggableEditorNode": DraggableEditorNode,
+    "VisualGuideCropNode": VisualGuideCropNode,
+    "InteractiveImageEditorNode": InteractiveImageEditorNode,
 }
 
-# 节点显示名称映射  
+# 节点显示名称映射
 NODE_DISPLAY_NAME_MAPPINGS = {
     "CircularCropNode": "圆形徽章裁剪",
     "BadgeLayoutNode": "徽章A4排版",
     "AutoOptimizeBadgeNode": "自动优化徽章参数",
     "InteractivePreviewNode": "交互式预览",
     "ParameterAdjustNode": "参数微调",
-    "DraggableEditorNode": "🎮 可拖拽编辑器",
+    "VisualGuideCropNode": "可视化引导裁剪",
+    "InteractiveImageEditorNode": "🎮 交互式拖拽编辑器",
 }
 
-# Web目录配置
-WEB_DIRECTORY = "./js"
-__all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS', 'WEB_DIRECTORY']
+# Web目录配置（告诉ComfyUI加载前端文件）
+WEB_DIRECTORY = "./web"
 

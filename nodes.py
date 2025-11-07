@@ -417,11 +417,347 @@ class AutoOptimizeBadgeNode:
         return (optimal_scale, offset_x, offset_y)
 
 
+class InteractivePreviewNode:
+    """交互式预览节点 - 生成带有参考线和网格的预览图，帮助调整参数"""
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "diameter_mm": ("FLOAT", {
+                    "default": 58.0,
+                    "min": 10.0,
+                    "max": 200.0,
+                    "step": 1.0
+                }),
+                "scale": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 0.1,
+                    "max": 5.0,
+                    "step": 0.01
+                }),
+                "offset_x": ("INT", {
+                    "default": 0,
+                    "min": -1000,
+                    "max": 1000,
+                    "step": 1
+                }),
+                "offset_y": ("INT", {
+                    "default": 0,
+                    "min": -1000,
+                    "max": 1000,
+                    "step": 1
+                }),
+                "dpi": ("INT", {
+                    "default": 300,
+                    "min": 72,
+                    "max": 600,
+                    "step": 1
+                }),
+                "show_grid": (["是", "否"],),
+                "show_safe_area": (["是", "否"],),
+            },
+        }
+    
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("预览图", "参数提示")
+    FUNCTION = "create_preview"
+    CATEGORY = "徽章工具/交互辅助"
+    
+    def create_preview(self, image, diameter_mm, scale, offset_x, offset_y, dpi, show_grid, show_safe_area):
+        """
+        创建交互式预览图
+        显示当前裁剪效果、参考线、网格等，帮助用户调整参数
+        """
+        # 转换为PIL
+        pil_image = tensor2pil(image)
+        
+        # 计算圆形直径
+        circle_diameter_px = int(diameter_mm / 25.4 * dpi)
+        circle_radius_px = circle_diameter_px // 2
+        
+        # 应用缩放
+        if scale != 1.0:
+            orig_width, orig_height = pil_image.size
+            new_width = int(orig_width * scale)
+            new_height = int(orig_height * scale)
+            pil_image = pil_image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
+        # 创建预览画布（比圆形大一些，方便观察）
+        preview_size = int(circle_diameter_px * 1.5)
+        preview_canvas = Image.new('RGB', (preview_size, preview_size), (240, 240, 240))
+        draw = ImageDraw.Draw(preview_canvas)
+        
+        # 计算图片粘贴位置
+        canvas_center_x = preview_size // 2
+        canvas_center_y = preview_size // 2
+        img_width, img_height = pil_image.size
+        paste_x = canvas_center_x - img_width // 2 + offset_x
+        paste_y = canvas_center_y - img_height // 2 + offset_y
+        
+        # 粘贴图片
+        preview_canvas.paste(pil_image, (paste_x, paste_y))
+        
+        # 绘制圆形边界（红色）
+        circle_left = canvas_center_x - circle_radius_px
+        circle_top = canvas_center_y - circle_radius_px
+        circle_right = canvas_center_x + circle_radius_px
+        circle_bottom = canvas_center_y + circle_radius_px
+        draw.ellipse([circle_left, circle_top, circle_right, circle_bottom], 
+                     outline=(255, 0, 0), width=3)
+        
+        # 绘制安全区域（蓝色虚线）
+        if show_safe_area == "是":
+            safe_radius = int(circle_radius_px * 0.9)
+            safe_left = canvas_center_x - safe_radius
+            safe_top = canvas_center_y - safe_radius
+            safe_right = canvas_center_x + safe_radius
+            safe_bottom = canvas_center_y + safe_radius
+            # 绘制虚线圆
+            for angle in range(0, 360, 10):
+                rad1 = math.radians(angle)
+                rad2 = math.radians(angle + 5)
+                x1 = canvas_center_x + int(safe_radius * math.cos(rad1))
+                y1 = canvas_center_y + int(safe_radius * math.sin(rad1))
+                x2 = canvas_center_x + int(safe_radius * math.cos(rad2))
+                y2 = canvas_center_y + int(safe_radius * math.sin(rad2))
+                draw.line([x1, y1, x2, y2], fill=(0, 0, 255), width=2)
+        
+        # 绘制十字参考线（绿色）
+        draw.line([0, canvas_center_y, preview_size, canvas_center_y], 
+                  fill=(0, 255, 0), width=1)
+        draw.line([canvas_center_x, 0, canvas_center_x, preview_size], 
+                  fill=(0, 255, 0), width=1)
+        
+        # 绘制网格
+        if show_grid == "是":
+            grid_spacing = circle_radius_px // 4
+            for i in range(-preview_size, preview_size, grid_spacing):
+                # 竖线
+                draw.line([canvas_center_x + i, 0, canvas_center_x + i, preview_size], 
+                         fill=(200, 200, 200), width=1)
+                # 横线
+                draw.line([0, canvas_center_y + i, preview_size, canvas_center_y + i], 
+                         fill=(200, 200, 200), width=1)
+        
+        # 生成参数提示文本
+        hint_text = f"""当前参数:
+缩放: {scale:.2f}x
+偏移X: {offset_x}px (负值←左, 正值→右)
+偏移Y: {offset_y}px (负值↑上, 正值↓下)
+徽章直径: {diameter_mm}mm ({circle_diameter_px}px)
+
+调整建议:
+- 图片太小/太大: 调整scale参数
+- 位置偏左: 增大offset_x (向右移)
+- 位置偏右: 减小offset_x (向左移)
+- 位置偏上: 增大offset_y (向下移)
+- 位置偏下: 减小offset_y (向上移)
+
+参考线说明:
+🔴 红圈: 最终裁剪边界
+🔵 蓝圈: 安全区域(建议主体在此内)
+🟢 十字: 中心参考线
+⬜ 网格: 位置参考"""
+        
+        # 转换回tensor
+        return (pil2tensor(preview_canvas), hint_text)
+
+
+class ParameterAdjustNode:
+    """参数微调节点 - 提供便捷的增量调整"""
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "current_scale": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 0.1,
+                    "max": 5.0,
+                    "step": 0.01
+                }),
+                "current_offset_x": ("INT", {
+                    "default": 0,
+                    "min": -1000,
+                    "max": 1000,
+                    "step": 1
+                }),
+                "current_offset_y": ("INT", {
+                    "default": 0,
+                    "min": -1000,
+                    "max": 1000,
+                    "step": 1
+                }),
+                "adjust_scale": (["不变", "放大10%", "放大5%", "缩小5%", "缩小10%", "重置为1.0"],),
+                "adjust_x": (["不变", "左移50", "左移10", "右移10", "右移50", "重置为0"],),
+                "adjust_y": (["不变", "上移50", "上移10", "下移10", "下移50", "重置为0"],),
+            },
+        }
+    
+    RETURN_TYPES = ("FLOAT", "INT", "INT", "STRING")
+    RETURN_NAMES = ("新缩放", "新偏移X", "新偏移Y", "变化说明")
+    FUNCTION = "adjust_parameters"
+    CATEGORY = "徽章工具/交互辅助"
+    
+    def adjust_parameters(self, current_scale, current_offset_x, current_offset_y, 
+                         adjust_scale, adjust_x, adjust_y):
+        """
+        根据选择的调整选项，计算新的参数值
+        """
+        new_scale = current_scale
+        new_x = current_offset_x
+        new_y = current_offset_y
+        changes = []
+        
+        # 调整缩放
+        if adjust_scale == "放大10%":
+            new_scale = min(5.0, current_scale * 1.1)
+            changes.append(f"缩放: {current_scale:.2f} → {new_scale:.2f} (放大10%)")
+        elif adjust_scale == "放大5%":
+            new_scale = min(5.0, current_scale * 1.05)
+            changes.append(f"缩放: {current_scale:.2f} → {new_scale:.2f} (放大5%)")
+        elif adjust_scale == "缩小5%":
+            new_scale = max(0.1, current_scale * 0.95)
+            changes.append(f"缩放: {current_scale:.2f} → {new_scale:.2f} (缩小5%)")
+        elif adjust_scale == "缩小10%":
+            new_scale = max(0.1, current_scale * 0.9)
+            changes.append(f"缩放: {current_scale:.2f} → {new_scale:.2f} (缩小10%)")
+        elif adjust_scale == "重置为1.0":
+            new_scale = 1.0
+            changes.append(f"缩放: {current_scale:.2f} → 1.0 (重置)")
+        
+        # 调整X偏移
+        if adjust_x == "左移50":
+            new_x = max(-1000, current_offset_x - 50)
+            changes.append(f"X偏移: {current_offset_x} → {new_x} (左移50px)")
+        elif adjust_x == "左移10":
+            new_x = max(-1000, current_offset_x - 10)
+            changes.append(f"X偏移: {current_offset_x} → {new_x} (左移10px)")
+        elif adjust_x == "右移10":
+            new_x = min(1000, current_offset_x + 10)
+            changes.append(f"X偏移: {current_offset_x} → {new_x} (右移10px)")
+        elif adjust_x == "右移50":
+            new_x = min(1000, current_offset_x + 50)
+            changes.append(f"X偏移: {current_offset_x} → {new_x} (右移50px)")
+        elif adjust_x == "重置为0":
+            new_x = 0
+            changes.append(f"X偏移: {current_offset_x} → 0 (重置)")
+        
+        # 调整Y偏移
+        if adjust_y == "上移50":
+            new_y = max(-1000, current_offset_y - 50)
+            changes.append(f"Y偏移: {current_offset_y} → {new_y} (上移50px)")
+        elif adjust_y == "上移10":
+            new_y = max(-1000, current_offset_y - 10)
+            changes.append(f"Y偏移: {current_offset_y} → {new_y} (上移10px)")
+        elif adjust_y == "下移10":
+            new_y = min(1000, current_offset_y + 10)
+            changes.append(f"Y偏移: {current_offset_y} → {new_y} (下移10px)")
+        elif adjust_y == "下移50":
+            new_y = min(1000, current_offset_y + 50)
+            changes.append(f"Y偏移: {current_offset_y} → {new_y} (下移50px)")
+        elif adjust_y == "重置为0":
+            new_y = 0
+            changes.append(f"Y偏移: {current_offset_y} → 0 (重置)")
+        
+        # 生成变化说明
+        if changes:
+            change_text = "参数调整:\n" + "\n".join(changes)
+        else:
+            change_text = "参数未变化"
+        
+        return (new_scale, new_x, new_y, change_text)
+
+
+class VisualGuideCropNode:
+    """可视化引导裁剪节点 - 结合预览和裁剪的一体化节点"""
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "diameter_mm": ("FLOAT", {
+                    "default": 58.0,
+                    "min": 10.0,
+                    "max": 200.0,
+                    "step": 1.0
+                }),
+                "scale": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 0.1,
+                    "max": 5.0,
+                    "step": 0.01,
+                    "display": "slider"
+                }),
+                "offset_x": ("INT", {
+                    "default": 0,
+                    "min": -1000,
+                    "max": 1000,
+                    "step": 1
+                }),
+                "offset_y": ("INT", {
+                    "default": 0,
+                    "min": -1000,
+                    "max": 1000,
+                    "step": 1
+                }),
+                "dpi": ("INT", {
+                    "default": 300,
+                    "min": 72,
+                    "max": 600,
+                    "step": 1
+                }),
+            },
+        }
+    
+    RETURN_TYPES = ("IMAGE", "IMAGE", "STRING")
+    RETURN_NAMES = ("裁剪结果", "预览图", "参数信息")
+    FUNCTION = "process"
+    CATEGORY = "徽章工具/交互辅助"
+    
+    def process(self, image, diameter_mm, scale, offset_x, offset_y, dpi):
+        """
+        同时输出裁剪结果和带参考线的预览图
+        方便在一个节点中查看效果并调整
+        """
+        # 1. 生成裁剪结果
+        crop_node = CircularCropNode()
+        cropped = crop_node.crop_to_circle(image, diameter_mm, scale, offset_x, offset_y, 0, dpi)
+        
+        # 2. 生成预览图
+        preview_node = InteractivePreviewNode()
+        preview, hint = preview_node.create_preview(
+            image, diameter_mm, scale, offset_x, offset_y, dpi, "是", "是"
+        )
+        
+        # 3. 生成参数信息
+        circle_diameter_px = int(diameter_mm / 25.4 * dpi)
+        info = f"""参数总览:
+徽章直径: {diameter_mm}mm ({circle_diameter_px}px @ {dpi}dpi)
+缩放比例: {scale:.2f}x
+X轴偏移: {offset_x}px
+Y轴偏移: {offset_y}px
+
+快速调整提示:
+1. 观察预览图中的红圈(裁剪边界)
+2. 确保主体内容在蓝圈(安全区)内
+3. 使用参数微调节点快速调整
+4. 或直接修改上方的scale/offset参数"""
+        
+        return (cropped[0], preview[0], info)
+
+
 # 节点映射字典
 NODE_CLASS_MAPPINGS = {
     "CircularCropNode": CircularCropNode,
     "BadgeLayoutNode": BadgeLayoutNode,
     "AutoOptimizeBadgeNode": AutoOptimizeBadgeNode,
+    "InteractivePreviewNode": InteractivePreviewNode,
+    "ParameterAdjustNode": ParameterAdjustNode,
+    "VisualGuideCropNode": VisualGuideCropNode,
 }
 
 # 节点显示名称映射
@@ -429,5 +765,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CircularCropNode": "圆形徽章裁剪",
     "BadgeLayoutNode": "徽章A4排版",
     "AutoOptimizeBadgeNode": "自动优化徽章参数",
+    "InteractivePreviewNode": "交互式预览",
+    "ParameterAdjustNode": "参数微调",
+    "VisualGuideCropNode": "可视化引导裁剪",
 }
 

@@ -1,9 +1,37 @@
-# BadgePatternTool - 徽章图案工具
+# BadgePatternTool-ComfyUI - 徽章图案工具
+
+> **ComfyUI版本说明：** 本项目已改造为ComfyUI自定义节点，可直接在ComfyUI中使用！
 
 ![alt text](<img/Dark theme.png>)
 ![alt text](<img/Light theme.png>)
 
 方便DIY的徽章制作图片处理和排版工具，支持将用户图片裁剪成可配置直径的圆形并在A4纸上智能排版。
+
+## 🎉 ComfyUI版本特性
+
+本项目现在可以作为ComfyUI的自定义节点使用！提供以下节点：
+
+- **圆形徽章裁剪节点**: 将图片裁剪成圆形徽章，支持缩放、偏移、旋转
+- **徽章A4排版节点**: 智能排版多个徽章到A4纸上（网格/紧凑模式）
+- **自动优化参数节点**: 自动计算最佳缩放和位置参数
+
+### 快速开始（ComfyUI版本）
+
+查看 [README_COMFYUI.md](README_COMFYUI.md) 获取详细的ComfyUI使用说明。
+
+### 安装到ComfyUI
+
+```bash
+cd ComfyUI/custom_nodes/
+git clone https://github.com/your-username/BadgePatternTool-ComfyUI.git
+# 重启ComfyUI即可使用
+```
+
+---
+
+## 原始桌面应用版本
+
+以下是原始桌面应用程序的说明（需要GUI环境）。
 
 ## 🎯 功能特性
 

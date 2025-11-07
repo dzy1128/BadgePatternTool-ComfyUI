@@ -1,0 +1,20 @@
+# BadgePatternTool-ComfyUI 依赖列表
+# 
+# 注意：这些依赖通常已经包含在ComfyUI中，无需额外安装
+# 此文件仅供参考
+
+# 图像处理
+Pillow>=9.0.0
+
+# 数值计算
+numpy>=1.20.0
+
+# 深度学习框架（ComfyUI必需）
+# torch>=1.13.0
+# torchvision>=0.14.0
+
+# 说明：
+# - 本节点不需要额外的pip安装
+# - 只要ComfyUI能正常运行，本节点就能工作
+# - 如果遇到导入错误，请确保ComfyUI本身已正确安装
+

@@ -1,0 +1,104 @@
+{
+  "description": "徽章制作工作流示例 - Badge Pattern Tool Example Workflow",
+  "workflow_examples": [
+    {
+      "name": "单张徽章制作",
+      "description": "将一张图片裁剪成圆形徽章",
+      "nodes": [
+        {
+          "type": "LoadImage",
+          "note": "加载原始图片"
+        },
+        {
+          "type": "CircularCropNode",
+          "parameters": {
+            "diameter_mm": 58.0,
+            "scale": 1.0,
+            "offset_x": 0,
+            "offset_y": 0,
+            "rotation": 0,
+            "dpi": 300
+          },
+          "note": "裁剪成圆形徽章"
+        },
+        {
+          "type": "SaveImage",
+          "note": "保存输出"
+        }
+      ]
+    },
+    {
+      "name": "批量徽章A4排版",
+      "description": "将多张图片制作成徽章并在A4纸上排版",
+      "nodes": [
+        {
+          "type": "LoadImage (批次)",
+          "note": "加载多张图片"
+        },
+        {
+          "type": "CircularCropNode",
+          "parameters": {
+            "diameter_mm": 58.0,
+            "dpi": 300
+          },
+          "note": "批量裁剪成圆形"
+        },
+        {
+          "type": "BadgeLayoutNode",
+          "parameters": {
+            "diameter_mm": 58.0,
+            "layout_type": "紧凑",
+            "spacing_mm": 5.0,
+            "margin_mm": 10.0,
+            "dpi": 300
+          },
+          "note": "A4排版"
+        },
+        {
+          "type": "SaveImage",
+          "note": "保存A4排版图"
+        }
+      ]
+    },
+    {
+      "name": "使用自动优化参数",
+      "description": "自动计算最佳缩放和位置参数",
+      "nodes": [
+        {
+          "type": "LoadImage",
+          "note": "加载原始图片"
+        },
+        {
+          "type": "AutoOptimizeBadgeNode",
+          "parameters": {
+            "diameter_mm": 58.0,
+            "dpi": 300
+          },
+          "note": "计算最佳参数",
+          "outputs": ["最佳缩放", "偏移X", "偏移Y"]
+        },
+        {
+          "type": "CircularCropNode",
+          "note": "使用优化后的参数裁剪",
+          "inputs_from_auto_optimize": {
+            "scale": "最佳缩放",
+            "offset_x": "偏移X",
+            "offset_y": "偏移Y"
+          }
+        },
+        {
+          "type": "SaveImage",
+          "note": "保存输出"
+        }
+      ]
+    }
+  ],
+  "tips": [
+    "建议使用300 DPI以获得打印级质量",
+    "紧凑模式比网格模式可以多排版约20-30%的徽章",
+    "58mm是最常见的徽章尺寸",
+    "使用自动优化节点可以快速获得最佳参数",
+    "调整offset参数可以精确控制图片在圆形中的位置"
+  ]
+}
+

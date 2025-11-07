@@ -121,23 +121,16 @@ class CircularCropNode:
         参数:
             img: PIL Image对象
             circle_size: 圆形直径（像素）
-            offset_x: X轴偏移（图片左上角相对于圆心的X坐标）
-            offset_y: Y轴偏移（图片左上角相对于圆心的Y坐标）
-        
-        坐标系说明：
-        - 原点(0,0) = 圆心
-        - offset_x, offset_y 控制图片左上角的位置
-        - offset_x=0, offset_y=0 时，图片左上角在圆心
-        - 要使图片居中：offset_x = -width/2, offset_y = -height/2
+            offset_x: X轴偏移
+            offset_y: Y轴偏移
         """
         img_width, img_height = img.size
         
-        # 计算粘贴位置（以图片左上角为参照点）
+        # 计算粘贴位置
         center_x = circle_size // 2
         center_y = circle_size // 2
-        # 修改：offset直接控制图片左上角相对于圆心的位置
-        paste_x = center_x + offset_x
-        paste_y = center_y + offset_y
+        paste_x = center_x - img_width // 2 + offset_x
+        paste_y = center_y - img_height // 2 + offset_y
         
         # 创建RGBA图像
         circle_img = Image.new('RGBA', (circle_size, circle_size), (255, 255, 255, 0))
@@ -401,9 +394,7 @@ class AutoOptimizeBadgeNode:
         """
         自动计算最佳参数
         
-        返回最佳的缩放比例和偏移量，使图片完美填充圆形并居中
-        
-        注意：由于参照点为图片左上角，偏移值用于将图片居中
+        返回最佳的缩放比例和偏移量，使图片完美填充圆形
         """
         # 转换为PIL
         pil_image = tensor2pil(image)
@@ -419,13 +410,9 @@ class AutoOptimizeBadgeNode:
         scale_y = circle_diameter_px / img_height
         optimal_scale = max(scale_x, scale_y)
         
-        # 计算居中偏移量（缩放后）
-        scaled_width = int(img_width * optimal_scale)
-        scaled_height = int(img_height * optimal_scale)
-        
-        # 要使图片居中，左上角应该在圆心左上方
-        offset_x = -scaled_width // 2
-        offset_y = -scaled_height // 2
+        # 偏移为0（居中）
+        offset_x = 0
+        offset_y = 0
         
         return (optimal_scale, offset_x, offset_y)
 

@@ -114,11 +114,9 @@ ComfyUI/custom_nodes/BadgePatternTool-ComfyUI/
 
 ### 🎮 交互式GUI节点
 
-#### 4. 🎮 交互式拖拽编辑器 (InteractiveImageEditorNode) ⚠️ 技术限制
+#### 4. 🎮 交互式拖拽编辑器 (InteractiveImageEditorNode) ⭐最推荐！
 
-**注意**: 由于ComfyUI前端扩展的技术限制，交互式拖拽画布可能无法正常显示。
-
-**实际推荐**: 使用"可视化引导裁剪"节点 + 快捷键（Ctrl+Enter）快速调整，效果相近！
+**真正的GUI交互！** 用鼠标直接拖动图片、滚轮缩放，就像使用桌面软件一样！
 
 **鼠标操作：**
 - **拖拽移动**: 在编辑器区域按住鼠标左键拖动图片
@@ -301,37 +299,6 @@ ComfyUI/custom_nodes/BadgePatternTool-ComfyUI/
 | 小型 | 32mm | 胸针、书签 |
 | 中型 | 58mm | 标准徽章、活动纪念品 |
 | 大型 | 75mm | 装饰徽章、展示用 |
-
-## 📐 坐标系统说明
-
-### offset_x 和 offset_y 的参照点
-
-**参照点 = 圆形徽章的中心**
-
-坐标轴方向：
-```
-     上(负值)
-        ↑
-左(负值)←●→右(正值)
-        ↓
-     下(正值)
-```
-
-**参数含义**：
-- `offset_x` **正值** → 图片向**右**移动
-- `offset_x` **负值** → 图片向**左**移动  
-- `offset_y` **正值** → 图片向**下**移动
-- `offset_y` **负值** → 图片向**上**移动
-
-**示例**：
-- 图片偏左？→ 增大 `offset_x`（如 offset_x: 50）
-- 图片偏右？→ 减小 `offset_x`（如 offset_x: -50）
-- 图片偏上？→ 增大 `offset_y`（如 offset_y: 30）
-- 图片偏下？→ 减小 `offset_y`（如 offset_y: -30）
-
-**详细说明**: 查看 [COORDINATE_SYSTEM.md](COORDINATE_SYSTEM.md)
-
----
 
 ## 💡 使用技巧
 
